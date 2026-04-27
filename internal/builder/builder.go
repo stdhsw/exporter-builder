@@ -93,7 +93,7 @@ func generateCollector(cfg *config.Config) error {
 	return nil
 }
 
-// generateGoMod cfg를 받아 go.mod 파일을 생성하고 go mod tidy 및 go mod vendor를 실행합니다.
+// generateGoMod cfg를 받아 go.mod 파일을 생성하고 go mod tidy를 실행합니다.
 // 파일 생성, 템플릿 실행, 또는 명령 실행 실패 시 error를 반환합니다.
 func generateGoMod(cfg *config.Config) error {
 	out, err := os.Create(filepath.Join(cfg.Name, goModTemplate.Name()))
@@ -106,11 +106,7 @@ func generateGoMod(cfg *config.Config) error {
 		return fmt.Errorf("failed execute go.mod template: %s", err)
 	}
 
-	if err := runCommand(cfg.Name, "go", "mod", "tidy"); err != nil {
-		return err
-	}
-
-	return runCommand(cfg.Name, "go", "mod", "vendor")
+	return runCommand(cfg.Name, "go", "mod", "tidy")
 }
 
 // runCommand dir 디렉토리에서 args 명령을 실행합니다.
