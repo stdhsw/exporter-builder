@@ -1,0 +1,66 @@
+package main
+
+import (
+	"flag"
+	"log/slog"
+	"net/http"
+	"os"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/common/promslog"
+    {{ range $key, $value := .Collectors }}
+    {{ $value }} "{{ $.Module }}/collector/{{ $value }}"
+    {{- end }}
+)
+
+var (
+	endpoint      string
+	listenAddress string
+	withProfiling bool
+	logLevel      string
+)
+
+func setFlags(addFlags ...func()) {
+	flag.StringVar(&endpoint, "web.telemetry-path", "/metrics", "Path under which to expose metrics.")
+	flag.StringVar(&listenAddress, "web.listen-address", ":9090", "Address on which to expose metrics and web interface.")
+	flag.BoolVar(&withProfiling, "profiling", false, "Enable profiling via web interface host:port/debug/pprof/")
+	flag.StringVar(&logLevel, "log.level", "info", "Only log messages with the given severity or above. Valid levels: [debug, info, warn, error]")
+
+	for _, f := range addFlags {
+		f()
+	}
+
+	flag.Parse()
+}
+
+func newLogger() *slog.Logger {
+	level := promslog.NewLevel()
+	_ = level.Set(logLevel)
+	return promslog.New(&promslog.Config{Level: level})
+}
+
+func main() {
+	setFlags(
+	    {{- range $key, $value := .Collectors }}
+	    {{ $value }}.SetFlags,
+        {{- end }}
+	)
+	logger := newLogger()
+
+	reg := prometheus.NewRegistry()
+	{{- range $key, $value := .Collectors }}
+	reg.MustRegister({{ $value }}.NewCollector())
+    {{- end }}
+
+	http.Handle(endpoint, promhttp.HandlerFor(reg, promhttp.HandlerOpts{
+		ErrorLog:      slog.NewLogLogger(logger.Handler(), slog.LevelError),
+		ErrorHandling: promhttp.ContinueOnError,
+	}))
+
+	logger.Info("Starting exporter", "address", listenAddress, "path", endpoint)
+	if err := http.ListenAndServe(listenAddress, nil); err != nil {
+		logger.Error("Failed to start web server", "err", err)
+		os.Exit(1)
+	}
+}
