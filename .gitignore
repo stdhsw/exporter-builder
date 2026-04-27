@@ -1,0 +1,6 @@
+# test 결과 무시
+result/
+test-exporter/
+test/
+
+
